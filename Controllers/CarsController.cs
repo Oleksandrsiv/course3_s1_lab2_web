@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using course3_s1_lab1_web.Data;
-using course3_s1_lab1_web.Models;
+using course3_s1_lab1_web.DTOs;
+using course3_s1_lab1_web.Interfaces;
 
 namespace course3_s1_lab1_web.Controllers;
 
@@ -8,17 +8,24 @@ namespace course3_s1_lab1_web.Controllers;
 [Route("api/[controller]")]
 public class CarsController : ControllerBase
 {
-    [HttpGet]
-    public ActionResult<IEnumerable<Car>> GetAll()
+    private readonly ICarService _carService;
+
+    public CarsController(ICarService carService)
     {
-        return Ok(DataStore.Cars); 
+        _carService = carService;
     }
 
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<CarResponseDto>>> GetAll()
+    {
+        var cars = await _carService.GetAllAsync();
+        return Ok(cars);
+    }
 
     [HttpGet("{id}")]
-    public ActionResult<Car> GetById(int id)
+    public async Task<ActionResult<CarResponseDto>> GetById(int id)
     {
-        var car = DataStore.Cars.FirstOrDefault(c => c.Id == id);
+        var car = await _carService.GetByIdAsync(id);
         if (car == null)
         {
             return NotFound();
@@ -26,62 +33,44 @@ public class CarsController : ControllerBase
         return Ok(car);
     }
 
-
     [HttpPost]
-    public ActionResult<Car> Create(Car newCar)
+    public async Task<ActionResult<CarResponseDto>> Create(CarCreateDto dto)
     {
-        var factoryExists = DataStore.Factories.Any(f => f.Id == newCar.FactoryId);
-        if (!factoryExists)
-        {
-            return BadRequest("Фабрики з таким FactoryId не існує."); 
-        }
-
-        newCar.Id = DataStore.Cars.Any() ? DataStore.Cars.Max(c => c.Id) + 1 : 1;
-        DataStore.Cars.Add(newCar);
+        var createdCar = await _carService.CreateAsync(dto);
         
-        return CreatedAtAction(nameof(GetById), new { id = newCar.Id }, newCar);
-    }
-
-
-    [HttpPut("{id}")]
-    public IActionResult Update(int id, Car updatedCar)
-    {
-        var car = DataStore.Cars.FirstOrDefault(c => c.Id == id);
-        if (car == null)
-        {
-            return NotFound();
-        }
-        
-        var factoryExists = DataStore.Factories.Any(f => f.Id == updatedCar.FactoryId);
-        if (!factoryExists)
+        if (createdCar == null)
         {
             return BadRequest("Фабрики з таким FactoryId не існує.");
         }
 
-        car.ModelName = updatedCar.ModelName;
-        car.FactoryId = updatedCar.FactoryId;
-        
-        return NoContent();
+        return CreatedAtAction(nameof(GetById), new { id = createdCar.Id }, createdCar);
     }
-    
 
-    [HttpDelete]
-    public IActionResult DeleteAll()
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, CarCreateDto dto)
     {
-        DataStore.Cars.Clear();
+        var result = await _carService.UpdateAsync(id, dto);
+        
+        if (result == null) 
+        {
+            return BadRequest("Фабрики з таким FactoryId не існує.");
+        }
+        if (result == false)
+        {
+            return NotFound("Машину не знайдено.");
+        }
+
         return NoContent();
     }
 
     [HttpDelete("{id}")]
-    public IActionResult DeleteById(int id)
+    public async Task<IActionResult> Delete(int id)
     {
-        var car = DataStore.Cars.FirstOrDefault(c => c.Id == id);
-        if (car == null)
+        var deleted = await _carService.DeleteAsync(id);
+        if (!deleted)
         {
             return NotFound();
         }
-        
-        DataStore.Cars.Remove(car);
         return NoContent();
     }
 }

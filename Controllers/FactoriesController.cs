@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using course3_s1_lab1_web.Data;
-using course3_s1_lab1_web.Models;
+using course3_s1_lab1_web.DTOs;
+using course3_s1_lab1_web.Interfaces;
 
 namespace course3_s1_lab1_web.Controllers;
 
@@ -8,81 +8,57 @@ namespace course3_s1_lab1_web.Controllers;
 [Route("api/[controller]")]
 public class FactoriesController : ControllerBase
 {
-    [HttpGet]
-    public ActionResult<IEnumerable<Factory>> GetAll()
+    private readonly IFactoryService _factoryService;
+
+    public FactoriesController(IFactoryService factoryService)
     {
-        return Ok(DataStore.Factories); 
+        _factoryService = factoryService;
     }
-    
+
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<FactoryResponseDto>>> GetAll()
+    {
+        var factories = await _factoryService.GetAllAsync();
+        return Ok(factories); 
+    }
 
     [HttpGet("{id}")]
-    public ActionResult<Factory> GetById(int id)
+    public async Task<ActionResult<FactoryResponseDto>> GetById(int id)
     {
-        var factory = DataStore.Factories.FirstOrDefault(f => f.Id == id);
+        var factory = await _factoryService.GetByIdAsync(id);
         if (factory == null)
         {
-            return NotFound();
+            return NotFound(); 
         }
         return Ok(factory);
     }
 
-
     [HttpPost]
-    public ActionResult<Factory> Create(Factory newFactory)
+    public async Task<ActionResult<FactoryResponseDto>> Create(FactoryCreateDto dto)
     {
-        newFactory.Id = DataStore.Factories.Any() ? DataStore.Factories.Max(f => f.Id) + 1 : 1;
-        DataStore.Factories.Add(newFactory);
-        
-        return CreatedAtAction(nameof(GetById), new { id = newFactory.Id }, newFactory);
+        var createdFactory = await _factoryService.CreateAsync(dto);
+        return CreatedAtAction(nameof(GetById), new { id = createdFactory.Id }, createdFactory);
     }
 
-
     [HttpPut("{id}")]
-    public IActionResult Update(int id, Factory updatedFactory)
+    public async Task<IActionResult> Update(int id, FactoryCreateDto dto)
     {
-        var factory = DataStore.Factories.FirstOrDefault(f => f.Id == id);
-        if (factory == null)
+        var updated = await _factoryService.UpdateAsync(id, dto);
+        if (!updated)
         {
             return NotFound();
         }
-        
-        factory.Name = updatedFactory.Name;
         return NoContent(); 
     }
 
-
-    [HttpDelete]
-    public IActionResult DeleteAll()
-    {
-        DataStore.Factories.Clear();
-        return NoContent();
-    }
-
-
     [HttpDelete("{id}")]
-    public IActionResult DeleteById(int id)
+    public async Task<IActionResult> Delete(int id)
     {
-        var factory = DataStore.Factories.FirstOrDefault(f => f.Id == id);
-        if (factory == null)
+        var deleted = await _factoryService.DeleteAsync(id);
+        if (!deleted)
         {
             return NotFound();
         }
-        
-        DataStore.Factories.Remove(factory);
         return NoContent();
-    }
-    
-    
-    [HttpGet("{factoryId}/cars")]
-    public ActionResult<IEnumerable<Car>> GetCarsByFactory(int factoryId)
-    {
-        var factoryExists = DataStore.Factories.Any(f => f.Id == factoryId);
-        if (!factoryExists)
-        {
-            return NotFound();
-        }
-        
-        var cars = DataStore.Cars.Where(c => c.FactoryId == factoryId).ToList();
-        return Ok(cars);
     }
 }
